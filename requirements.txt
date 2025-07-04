@@ -1,8 +1,0 @@
-fastapi
-uvicorn
-pdfplumber
-pdf2image
-pytesseract
-python-multipart
-pydantic
-Pillow
