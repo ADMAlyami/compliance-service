@@ -1,76 +1,293 @@
 import re
-from typing import Dict, Tuple
+import logging
+from typing import Dict, Tuple, List
+from datetime import datetime
+
+logger = logging.getLogger(__name__)
+
+# Enhanced regex patterns with multiple variations
+INSURANCE_PATTERNS = {
+    "insured": [
+        r"INSURED:\s*([^\n\r]+)",
+        r"INSURED\s+NAME:\s*([^\n\r]+)",
+        r"NAMED\s+INSURED:\s*([^\n\r]+)",
+        r"COMPANY:\s*([^\n\r]+)",
+        r"BUSINESS\s+NAME:\s*([^\n\r]+)"
+    ],
+    "policy_number": [
+        r"POLICY\s+NUMBER:\s*([^\n\r]+)",
+        r"POLICY\s+#:\s*([^\n\r]+)",
+        r"POLICY\s+NO:\s*([^\n\r]+)",
+        r"CERTIFICATE\s+NUMBER:\s*([^\n\r]+)"
+    ],
+    "insurer": [
+        r"INSURER:\s*([^\n\r]+)",
+        r"INSURANCE\s+COMPANY:\s*([^\n\r]+)",
+        r"CARRIER:\s*([^\n\r]+)",
+        r"PROVIDER:\s*([^\n\r]+)"
+    ],
+    "coverage_type": [
+        r"COVERAGE\s+TYPE:\s*([^\n\r]+)",
+        r"TYPE\s+OF\s+COVERAGE:\s*([^\n\r]+)",
+        r"INSURANCE\s+TYPE:\s*([^\n\r]+)"
+    ],
+    "effective_date": [
+        r"EFFECTIVE\s+DATE:\s*([\d\/\-]+)",
+        r"INCEPTION\s+DATE:\s*([\d\/\-]+)",
+        r"START\s+DATE:\s*([\d\/\-]+)",
+        r"FROM:\s*([\d\/\-]+)"
+    ],
+    "expiry_date": [
+        r"EXPIRY\s+DATE:\s*([^\n\r]+)",
+        r"EXPIRATION\s+DATE:\s*([^\n\r]+)",
+        r"EXPIRATION:\s*([^\n\r]+)",
+        r"UNTIL:\s*([^\n\r]+)",
+        r"END\s+DATE:\s*([^\n\r]+)",
+        r"TO:\s*([^\n\r]+)",
+        r"EXPIRES:\s*([^\n\r]+)",
+        r"VALID\s+UNTIL:\s*([^\n\r]+)"
+    ]
+}
+
+INSPECTION_PATTERNS = {
+    "inspector": [
+        r"INSPECTOR:\s*([^\n\r]+)",
+        r"INSPECTED\s+BY:\s*([^\n\r]+)",
+        r"QUALIFIED\s+PERSON:\s*([^\n\r]+)"
+    ],
+    "inspection_date": [
+        r"INSPECTION\s+DATE:\s*([^\n\r]+)",
+        r"DATE\s+OF\s+INSPECTION:\s*([^\n\r]+)",
+        r"INSPECTED\s+ON:\s*([^\n\r]+)"
+    ],
+    "equipment_id": [
+        r"(CRANE|EQUIPMENT)\s+ID:\s*([^\n\r]+)",
+        r"SERIAL\s+NUMBER:\s*([^\n\r]+)",
+        r"EQUIPMENT\s+NUMBER:\s*([^\n\r]+)",
+        r"MODEL\s+NUMBER:\s*([^\n\r]+)"
+    ],
+    "result": [
+        r"RESULT:\s*(PASS|FAIL)",
+        r"STATUS:\s*(PASS|FAIL)",
+        r"INSPECTION\s+RESULT:\s*(PASS|FAIL)",
+        r"CONDITION:\s*(PASS|FAIL)"
+    ]
+}
+
+TRAINING_PATTERNS = {
+    "worker_name": [
+        r"WORKER\s+NAME:\s*([^\n\r]+)",
+        r"EMPLOYEE\s+NAME:\s*([^\n\r]+)",
+        r"NAME:\s*([^\n\r]+)",
+        r"TRAINEE:\s*([^\n\r]+)"
+    ],
+    "certificate_id": [
+        r"CERTIFICATE\s+ID:\s*([^\n\r]+)",
+        r"CARD\s+NUMBER:\s*([^\n\r]+)",
+        r"ID\s+NUMBER:\s*([^\n\r]+)",
+        r"LICENSE\s+NUMBER:\s*([^\n\r]+)"
+    ],
+    "hours": [
+        r"HOURS:\s*([^\n\r]+)",
+        r"TRAINING\s+HOURS:\s*([^\n\r]+)",
+        r"DURATION:\s*([^\n\r]+)"
+    ],
+    "issue_date": [
+        r"ISSUE\s+DATE:\s*([^\n\r]+)",
+        r"DATE\s+ISSUED:\s*([^\n\r]+)",
+        r"ISSUED\s+ON:\s*([^\n\r]+)"
+    ],
+    "expiry_date": [
+        r"EXPIRY\s+DATE:\s*([^\n\r]+)",
+        r"EXPIRATION\s+DATE:\s*([^\n\r]+)",
+        r"VALID\s+UNTIL:\s*([^\n\r]+)"
+    ],
+    "issued_by": [
+        r"ISSUED\s+BY:\s*([^\n\r]+)",
+        r"TRAINING\s+PROVIDER:\s*([^\n\r]+)",
+        r"ORGANIZATION:\s*([^\n\r]+)"
+    ]
+}
 
 def parse_document_type(text: str) -> str:
+    """
+    Enhanced document type detection with confidence scoring.
+    
+    Args:
+        text: Extracted text from document
+        
+    Returns:
+        Document type string
+    """
     text_lower = text.lower()
-    if "liability insurance" in text_lower:
-        return "insurance"
-    if "inspection checklist" in text_lower or "inspection sheet" in text_lower:
-        return "inspection"
-    if "training card" in text_lower or "osha" in text_lower:
-        return "training"
+    
+    # Score-based detection
+    scores = {
+        "insurance": 0,
+        "inspection": 0,
+        "training": 0
+    }
+    
+    # Insurance keywords
+    insurance_keywords = [
+        "liability insurance", "general liability", "workers compensation",
+        "certificate of insurance", "insurance certificate", "policy",
+        "coverage", "insured", "insurer", "premium"
+    ]
+    
+    # Inspection keywords
+    inspection_keywords = [
+        "inspection checklist", "inspection sheet", "equipment inspection",
+        "safety inspection", "crane inspection", "hoist inspection",
+        "inspector", "qualified person", "inspection date"
+    ]
+    
+    # Training keywords
+    training_keywords = [
+        "training card", "osha", "safety training", "certification",
+        "worker qualification", "training certificate", "safety card",
+        "competent person", "training hours"
+    ]
+    
+    # Calculate scores
+    for keyword in insurance_keywords:
+        if keyword in text_lower:
+            scores["insurance"] += 1
+    
+    for keyword in inspection_keywords:
+        if keyword in text_lower:
+            scores["inspection"] += 1
+    
+    for keyword in training_keywords:
+        if keyword in text_lower:
+            scores["training"] += 1
+    
+    # Return the type with highest score, or "unknown" if no clear match
+    max_score = max(scores.values())
+    if max_score > 0:
+        for doc_type, score in scores.items():
+            if score == max_score:
+                logger.info(f"Detected document type: {doc_type} (score: {score})")
+                return doc_type
+    
+    logger.warning("Could not determine document type")
     return "unknown"
 
+def extract_field_with_patterns(text: str, patterns: List[str]) -> Tuple[str | None, float]:
+    """
+    Extract a field using multiple regex patterns and return the best match.
+    
+    Args:
+        text: Text to search in
+        patterns: List of regex patterns to try
+        
+    Returns:
+        Tuple of (extracted_value, confidence_score)
+    """
+    for pattern in patterns:
+        try:
+            match = re.search(pattern, text, re.IGNORECASE | re.MULTILINE)
+            if match:
+                value = match.group(1).strip()
+                if value and len(value) > 0:
+                    # Calculate confidence based on pattern complexity and match quality
+                    confidence = calculate_confidence(pattern, value, text)
+                    return value, confidence
+        except Exception as e:
+            logger.debug(f"Error with pattern {pattern}: {e}")
+            continue
+    
+    return None, 0.0
+
+def calculate_confidence(pattern: str, value: str, context: str) -> float:
+    """
+    Calculate confidence score for extracted field.
+    
+    Args:
+        pattern: Regex pattern used
+        value: Extracted value
+        context: Surrounding text context
+        
+    Returns:
+        Confidence score between 0.0 and 1.0
+    """
+    base_confidence = 0.8
+    
+    # Adjust based on value quality
+    if len(value) < 2:
+        base_confidence -= 0.3
+    elif len(value) > 100:
+        base_confidence -= 0.2
+    
+    # Adjust based on pattern specificity
+    if ":" in pattern:
+        base_confidence += 0.1
+    
+    # Adjust based on context
+    if value.lower() in ["n/a", "none", "unknown", "tbd"]:
+        base_confidence -= 0.4
+    
+    # Ensure confidence is within bounds
+    return max(0.0, min(1.0, base_confidence))
+
 def parse_fields(text: str, doc_type: str) -> Tuple[Dict[str, str], Dict[str, float]]:
+    """
+    Parse fields from document text based on document type.
+    
+    Args:
+        text: Extracted text from document
+        doc_type: Type of document
+        
+    Returns:
+        Tuple of (fields_dict, confidence_dict)
+    """
     fields = {}
     confidence = {}
-
-    if doc_type == "insurance":
-        insured = re.search(r"INSURED: (.+)", text)
-        policy = re.search(r"POLICY NUMBER: (.+)", text)
-        insurer = re.search(r"INSURER: (.+)", text)
-        coverage = re.search(r"COVERAGE TYPE: (.+)", text)
-        issue = re.search(r"EFFECTIVE DATE: ([\d/-]+)", text)
-        expiry = re.search(r"EXPIR(Y|I) DATE: ([\d/-]+)", text, re.IGNORECASE)
-        fields["insured"] = insured.group(1).strip() if insured else None
-        confidence["insured"] = 0.95 if insured else 0.0
-        fields["policy_number"] = policy.group(1).strip() if policy else None
-        confidence["policy_number"] = 0.95 if policy else 0.0
-        fields["insurer"] = insurer.group(1).strip() if insurer else None
-        confidence["insurer"] = 0.95 if insurer else 0.0
-        fields["coverage_type"] = coverage.group(1).strip() if coverage else None
-        confidence["coverage_type"] = 0.9 if coverage else 0.0
-        fields["effective_date"] = issue.group(1).strip() if issue else None
-        confidence["effective_date"] = 0.95 if issue else 0.0
-        fields["expiry_date"] = expiry.group(2).strip() if expiry else None
-        confidence["expiry_date"] = 0.95 if expiry else 0.0
-
-    elif doc_type == "inspection":
-        inspector = re.search(r"Inspector: (.+)", text)
-        inspection_date = re.search(r"Inspection Date: (.+)", text)
-        equipment_id = re.search(r"(Crane|Equipment) ID: (.+)", text)
-        result = re.search(r"Result: (PASS|FAIL)", text, re.IGNORECASE)
-        fields["inspector"] = inspector.group(1).strip() if inspector else None
-        confidence["inspector"] = 0.95 if inspector else 0.0
-        fields["inspection_date"] = inspection_date.group(1).strip() if inspection_date else None
-        confidence["inspection_date"] = 0.95 if inspection_date else 0.0
-        fields["equipment_id"] = equipment_id.group(2).strip() if equipment_id else None
-        confidence["equipment_id"] = 0.9 if equipment_id else 0.0
-        fields["result"] = result.group(1).strip().upper() if result else None
-        confidence["result"] = 0.95 if result else 0.0
-
-    elif doc_type == "training":
-        name = re.search(r"Worker Name: (.+)", text)
-        cert_id = re.search(r"Certificate ID: (.+)", text)
-        hours = re.search(r"Hours: (.+)", text)
-        issue = re.search(r"Issue Date: (.+)", text)
-        expiry = re.search(r"Expiry Date: (.+)", text)
-        issued_by = re.search(r"Issued By: (.+)", text)
-        fields["worker_name"] = name.group(1).strip() if name else None
-        confidence["worker_name"] = 0.95 if name else 0.0
-        fields["certificate_id"] = cert_id.group(1).strip() if cert_id else None
-        confidence["certificate_id"] = 0.95 if cert_id else 0.0
-        fields["hours"] = hours.group(1).strip() if hours else None
-        confidence["hours"] = 0.9 if hours else 0.0
-        fields["issue_date"] = issue.group(1).strip() if issue else None
-        confidence["issue_date"] = 0.95 if issue else 0.0
-        fields["expiry_date"] = expiry.group(1).strip() if expiry else None
-        confidence["expiry_date"] = 0.95 if expiry else 0.0
-        fields["issued_by"] = issued_by.group(1).strip() if issued_by else None
-        confidence["issued_by"] = 0.95 if issued_by else 0.0
-
-    else:
-        # fallback, extract nothing
-        pass
-
+    
+    try:
+        if doc_type == "insurance":
+            patterns = INSURANCE_PATTERNS
+        elif doc_type == "inspection":
+            patterns = INSPECTION_PATTERNS
+        elif doc_type == "training":
+            patterns = TRAINING_PATTERNS
+        else:
+            logger.warning(f"Unknown document type: {doc_type}")
+            return fields, confidence
+        
+        # Extract each field
+        for field_name, field_patterns in patterns.items():
+            value, conf = extract_field_with_patterns(text, field_patterns)
+            if value is not None:
+                fields[field_name] = value
+                confidence[field_name] = conf
+                logger.debug(f"Extracted {field_name}: {value} (confidence: {conf:.2f})")
+        
+        logger.info(f"Extracted {len(fields)} fields from {doc_type} document")
+        
+    except Exception as e:
+        logger.error(f"Error parsing fields for {doc_type}: {e}")
+    
     return fields, confidence
+
+def clean_extracted_value(value: str) -> str | None:
+    """
+    Clean and normalize extracted field values.
+    
+    Args:
+        value: Raw extracted value
+        
+    Returns:
+        Cleaned value
+    """
+    if not value:
+        return None
+    
+    # Remove extra whitespace and normalize
+    cleaned = re.sub(r'\s+', ' ', value.strip())
+    
+    # Remove common artifacts
+    cleaned = re.sub(r'^[^\w]*', '', cleaned)  # Remove leading non-word chars
+    cleaned = re.sub(r'[^\w]*$', '', cleaned)  # Remove trailing non-word chars
+    
+    return cleaned if cleaned else None
