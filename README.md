@@ -1,4 +1,4 @@
-# 📋 Enhanced Compliance Document Microservice
+# 📋  Documents Compliance Checks Microservice
 
 A robust, production-ready microservice that automates compliance checks on subcontractor documents including insurance certificates, equipment inspection sheets, and OSHA training cards. Features a beautiful web interface and enhanced processing capabilities.
 
@@ -6,18 +6,10 @@ A robust, production-ready microservice that automates compliance checks on subc
 
 ### Core Functionality
 - **Multi-file Processing**: Upload and process multiple PDF files simultaneously
-- **Advanced Text Extraction**: Native PDF parsing with intelligent OCR fallback
-- **Smart Field Parsing**: Flexible regex patterns with confidence scoring
 - **Robust Validation**: Comprehensive compliance rules with grace periods
-- **Beautiful Web UI**: Modern, responsive interface with drag-and-drop support
+- **Beautiful Web UI**
 
-### Technical Improvements
-- **Error Handling**: Comprehensive error handling and logging
-- **Input Validation**: File size limits, type checking, and security measures
-- **Enhanced Date Parsing**: Support for multiple date formats
-- **Confidence Scoring**: Intelligent confidence calculation for extracted fields
-- **CORS Support**: Ready for frontend integration
-- **Health Checks**: Built-in health monitoring endpoints
+
 
 ### Document Types Supported
 1. **Insurance Certificates**: Liability insurance, workers compensation, etc.
