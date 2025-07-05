@@ -89,35 +89,7 @@ Implement user authentication or API key support for production deployments.
     - Or submit a `POST` request to `/check-docs` with one or more PDF files attached as form-data.
 
 
-Architecture & Design Choices
-Framework: FastAPI is used for its speed, simplicity, and built-in API documentation.
 
-Text Extraction: pdfplumber is used for native PDF text extraction. If text extraction fails or yields little content, OCR is performed using pytesseract and pdf2image to handle scanned/image-based documents.
-
-Field Parsing: Regular expressions and rules-based logic are used to extract structured fields from semi-structured documents. This approach is transparent and easy to extend for more document types.
-
-Validation: Validation rules are applied based on document type (such as checking expiry dates, presence of required fields, and format correctness).
-
-Confidence Scoring: Confidence is assigned heuristically based on field extraction success, allowing users to assess data reliability.
-
-Stateless Microservice: The API is stateless; no documents or results are stored. This makes the service scalable and suitable for containerization or deployment in serverless environments.
-
-Multi-file Support: The /check-docs endpoint is designed to accept and process multiple files in one request, providing a result for each file in the response.
-
-Potential Improvements
-Use ML/NLP-based entity extraction for greater accuracy with more varied or complex document layouts
-
-Add a simple web-based user interface for manual uploads and visual review
-
-Extend support for direct image files (JPG, PNG, TIFF)
-
-Implement more robust document type detection and validation based on project-specific requirements
-
-Add logging, audit trails, and error monitoring for compliance and debugging
-
-Provide deployment scripts for cloud platforms and add CI/CD integration for easier updates and reliability
-
-Implement user authentication or API key support for production deployments
 ---
 
 ## API Usage
