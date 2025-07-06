@@ -329,7 +329,7 @@ For issues and questions:
 
 ---
 
-**Built with ❤️ for compliance automation**
+**Built with ❤️**
 
 
 
